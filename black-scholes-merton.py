@@ -13,7 +13,7 @@ import shutil
 
 
 # FRED API setup
-os.environ['FRED_API_KEY'] = '81b42521f02d005e5d11afe53a81b757'
+os.environ['FRED_API_KEY'] = 'PUT YOUR API KEY HERE'
 fred = Fred(api_key=os.environ['FRED_API_KEY'])
 CACHE_FILE = 'treasury_yields_cache.json'
 

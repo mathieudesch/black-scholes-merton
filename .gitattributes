@@ -1,2 +1,41 @@
-# Auto detect text files and perform LF normalization
+# Set default behavior to automatically normalize line endings
 * text=auto
+
+# Source files
+# ============
+*.py text diff=python
+*.pyw text diff=python
+
+# Python binary files
+*.db binary
+*.pkl binary
+*.pyc binary
+
+# Jupyter notebook
+*.ipynb text
+
+# Data files
+*.csv text
+*.json text
+*.xml text
+
+# Text files
+*.txt text
+*.md text
+README text
+
+# Scripts
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# Graphics
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+
+# Exclude files from exporting
+.gitattributes export-ignore
+.gitignore export-ignore

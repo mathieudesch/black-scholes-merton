@@ -153,19 +153,6 @@ def get_user_input():
     else:
         ticker = None
 
-    print("\nSelect the price type to use:")
-    print("1. Mark Price (midpoint between bid and ask)")
-    print("2. Ask Price (typically used for buying an option)")
-    print("3. Bid Price (typically used for selling an option)")
-    
-    while True:
-        price_type_choice = input("Enter your choice (1, 2, or 3): ")
-        if price_type_choice in ['1', '2', '3']:
-            break
-        print("Invalid choice. Please enter 1, 2, or 3.")
-    
-    price_type = ['mark', 'ask', 'bid'][int(price_type_choice) - 1]
-
     print("\nSelect the option type to analyze:")
     print("1. Calls")
     print("2. Puts")
@@ -179,6 +166,32 @@ def get_user_input():
     
     option_type = ['call', 'put', 'both'][int(option_type_choice) - 1]
 
+    print("\nSelect the option moneyness to analyze:")
+    print("1. In-the-money (ITM)")
+    print("2. Out-of-the-money (OTM)")
+    print("3. Both")
+    
+    while True:
+        moneyness_choice = input("Enter your choice (1, 2, or 3): ")
+        if moneyness_choice in ['1', '2', '3']:
+            break
+        print("Invalid choice. Please enter 1, 2, or 3.")
+    
+    moneyness = ['ITM', 'OTM', 'BOTH'][int(moneyness_choice) - 1]
+
+    print("\nSelect the price type to use:")
+    print("1. Mark Price (midpoint between bid and ask)")
+    print("2. Ask Price (typically used for buying an option)")
+    print("3. Bid Price (typically used for selling an option)")
+    
+    while True:
+        price_type_choice = input("Enter your choice (1, 2, or 3): ")
+        if price_type_choice in ['1', '2', '3']:
+            break
+        print("Invalid choice. Please enter 1, 2, or 3.")
+    
+    price_type = ['mark', 'ask', 'bid'][int(price_type_choice) - 1]
+
     print("\nEnter the following parameters (type 'NONE' if you don't want to set a limit):")
     
     min_price = input(f"Minimum {price_type} price: ")
@@ -189,9 +202,20 @@ def get_user_input():
     
     min_open_interest = input("Minimum open interest: ")
     min_open_interest = int(min_open_interest) if min_open_interest.lower() != 'none' else None
-    
-    return choice, ticker, price_type, option_type, min_price, max_price, min_open_interest
 
+    print("\nSelect how you want to sort the output:")
+    print("1. By percent difference (high to low)")
+    print(f"2. By {price_type} price (high to low)")
+    
+    while True:
+        sort_choice = input("Enter your choice (1 or 2): ")
+        if sort_choice in ['1', '2']:
+            break
+        print("Invalid choice. Please enter 1 or 2.")
+    
+    sort_by = 'percentDifference' if sort_choice == '1' else 'selectedPrice'
+    
+    return choice, ticker, price_type, option_type, moneyness, min_price, max_price, min_open_interest, sort_by
 
 def get_option_data(ticker, price_type, option_type, min_price, max_price, min_open_interest):
     stock = yf.Ticker(ticker)
@@ -259,7 +283,7 @@ def get_option_data(ticker, price_type, option_type, min_price, max_price, min_o
 
     return options
 
-def analyze_options(ticker, price_type, option_type, min_price, max_price, min_open_interest):
+def analyze_options(ticker, price_type, option_type, moneyness, min_price, max_price, min_open_interest):
     try:
         current_price = get_current_price(ticker)
         options = get_option_data(ticker, price_type, option_type, min_price, max_price, min_open_interest)
@@ -268,37 +292,58 @@ def analyze_options(ticker, price_type, option_type, min_price, max_price, min_o
             print_aligned(ticker, "No options meeting the criteria")
             return pd.DataFrame()
 
+        # Filter based on moneyness
+        if moneyness == 'ITM':
+            options = options[((options['optionType'] == 'call') & (options['strike'] < current_price)) |
+                              ((options['optionType'] == 'put') & (options['strike'] > current_price))]
+        elif moneyness == 'OTM':
+            options = options[((options['optionType'] == 'call') & (options['strike'] > current_price)) |
+                              ((options['optionType'] == 'put') & (options['strike'] < current_price))]
+        # If 'BOTH', no filtering needed
+
         theoretical_prices = price_options(options, current_price)
         options['theoreticalPrice'] = theoretical_prices
         options['marketPrice'] = options['selectedPrice']
         options['priceDifference'] = options['theoreticalPrice'] - options['marketPrice']
         options['percentDifference'] = options['priceDifference'] / options['marketPrice'] * 100
 
-        underpriced_options = options[options['percentDifference'] > 15].sort_values('percentDifference', ascending=False)
+        # Remove options with infinite or extremely high percent differences
+        valid_options = options[~np.isinf(options['percentDifference']) & (options['percentDifference'] <= 500)]
+        
+        removed_count = len(options) - len(valid_options)
+        if removed_count > 0:
+            print_aligned(ticker, f"Removed {removed_count} option(s) with invalid or extremely high percent differences")
+
+        underpriced_options = valid_options[valid_options['percentDifference'] > 15].sort_values('percentDifference', ascending=False)
+        
+        if not underpriced_options.empty:
+            print_aligned(ticker, f"Found {len(underpriced_options)} potentially underpriced option(s)")
+        else:
+            print_aligned(ticker, "No underpriced options found after filtering")
+
         return underpriced_options
     except Exception as e:
         print(f"{ticker} - Error analyzing: {e}")
         return pd.DataFrame()
 
-def process_stock(ticker, price_type, option_type, min_price, max_price, min_open_interest):
+def process_stock(ticker, price_type, option_type, moneyness, min_price, max_price, min_open_interest):
     try:
-        underpriced = analyze_options(ticker, price_type, option_type, min_price, max_price, min_open_interest)
+        underpriced = analyze_options(ticker, price_type, option_type, moneyness, min_price, max_price, min_open_interest)
         if not underpriced.empty:
-            print_aligned(ticker, "Underpriced options found")
             underpriced['ticker'] = ticker
             return underpriced
         else:
-            print_aligned(ticker, "No options meeting the criteria")
             return pd.DataFrame()
     except Exception as e:
         print_aligned(ticker, f"Error processing: {e}")
         return pd.DataFrame()
+    
 
 def main():
     start_time = time.time()  # Record the start time
 
     print("Stock Option Analyzer")
-    choice, specific_ticker, price_type, option_type, min_price, max_price, min_open_interest = get_user_input()
+    choice, specific_ticker, price_type, option_type, moneyness, min_price, max_price, min_open_interest, sort_by = get_user_input()
     
     if choice == '1':
         print("Analyzing S&P 500 stocks...")
@@ -312,26 +357,29 @@ def main():
     all_underpriced_options = pd.DataFrame()
     
     with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
-        futures = [executor.submit(process_stock, ticker, price_type, option_type, min_price, max_price, min_open_interest) for ticker in tickers]
+        futures = [executor.submit(process_stock, ticker, price_type, option_type, moneyness, min_price, max_price, min_open_interest) for ticker in tickers]
         for future in as_completed(futures):
             result = future.result()
             if not result.empty:
                 all_underpriced_options = pd.concat([all_underpriced_options, result])
 
     if not all_underpriced_options.empty:
-        all_underpriced_options = all_underpriced_options.sort_values(['expirationDate', 'percentDifference'], ascending=[True, False])
+        # Sort the options based on user's choice
+        all_underpriced_options = all_underpriced_options.sort_values(sort_by, ascending=False)
         
         with open('output.txt', 'w') as f:
-            f.write(f"Underpriced Options for {index_name} (Sorted by Date, then Percent Difference)\n")
+            f.write(f"Underpriced Options for {index_name}\n")
             f.write("======================================================\n\n")
             f.write(f"Filters applied:\n")
             f.write(f"Analysis: {index_name}\n")
             f.write(f"Price type used: {price_type.capitalize()} price\n")
             f.write(f"Option type analyzed: {option_type.capitalize()}\n")
+            f.write(f"Option moneyness analyzed: {moneyness}\n")    
             f.write(f"Minimum {price_type} price: {min_price if min_price is not None else 'None'}\n")
             f.write(f"Maximum {price_type} price: {max_price if max_price is not None else 'None'}\n")
             f.write(f"Minimum open interest: {min_open_interest if min_open_interest is not None else 'None'}\n")
-            f.write(f"Expiration date limit: 1 year from today ({datetime.now().date() + timedelta(days=365)})\n\n")
+            f.write(f"Expiration date limit: 1 year from today ({datetime.now().date() + timedelta(days=365)})\n")
+            f.write(f"Sorted by: {'Percent Difference' if sort_by == 'percentDifference' else price_type.capitalize() + ' Price'}\n\n")
             
             for _, option in all_underpriced_options.iterrows():
                 f.write(f"Ticker: {option['ticker']}\n")

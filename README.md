@@ -2,7 +2,7 @@
 
 ## Description
 
-The Stock Option Analyzer is a Python program designed to identify potentially underpriced stock options in the market. It uses the Black-Scholes-Merton model to calculate theoretical option prices and compares them with market prices. It is designed to run off a GPU in order to utilize PyTorch's parallel processing so you can evaluate datasets quickly while maintaining accuracy. The program can analyze options for the entire S&P 500 index or for a specific stock, allowing users to find potential trading opportunities. In this version I used yfinance to make this program completely free and accessible to anyone but I HIGHLY reccomend using a paid API like Polygon.io for real time data that is often times much more reliable.
+The Stock Option Analyzer is a Python program designed to identify potentially underpriced stock options in the American stock market. It uses the Black-Scholes-Merton model to calculate theoretical option prices and compares them with market prices. This could also be used to deduce the implied volatility of an option contract, camparing the theoretical price to the market price. It is designed to run off a GPU in order to utilize PyTorch's parallel processing so you can evaluate datasets quickly while maintaining accuracy. The program can analyze options for the entire S&P 500 index or for a specific stock, allowing users to find potential trading opportunities. In this version I used yfinance to make this program completely free and accessible to anyone but I HIGHLY reccomend using a paid API like Polygon.io for real time data that is often times much more reliable.
 
 Key features:
 - Analyze S&P 500 stocks or a specific stock
